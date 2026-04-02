@@ -1,0 +1,9 @@
+faster-whisper
+opencc-python-reimplemented
+sounddevice
+numpy
+keyboard
+pyperclip
+pyinstaller
+Pillow
+pywin32
