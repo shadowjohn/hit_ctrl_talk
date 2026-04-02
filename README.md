@@ -4,6 +4,14 @@
 
 單獨按住任一顆 `Ctrl` 一小段時間後開始錄音，放開全部 `Ctrl` 後停止錄音，接著使用 `faster-whisper` 做語音辨識，再透過 `OpenCC` 把簡體中文轉成正體中文，最後把文字送進目前游標所在的應用程式。
 
+# 作者
+
+羽山秋人 (https://3wa.tw)
+
+# 版本
+
+V0.0.1
+
 ## 功能行為
 
 - 一般快捷鍵如 `Ctrl+C`、`Ctrl+V`、`Ctrl+X`、`Ctrl+Z`、`Ctrl+S` 應可正常使用。
@@ -40,12 +48,12 @@ python hit_ctrl_talk.py
 常用參數範例：
 
 ```powershell
-python hit_ctrl_talk.py --model base --paste-mode clipboard --device auto --hold-ms 300
+python hit_ctrl_talk.py --model small --paste-mode clipboard --device auto --hold-ms 300
 python hit_ctrl_talk.py --paste-mode unicode
 python hit_ctrl_talk.py --device cpu
 python hit_ctrl_talk.py --device-index 1
 
-# 啥都不寫就自動 --model base --paste-mode clipboard --device auto --hold-ms 300
+# 啥都不寫就自動 --model small --paste-mode clipboard --device auto --hold-ms 300
 python hit_ctrl_talk.py 
 ```
 
@@ -55,6 +63,7 @@ python hit_ctrl_talk.py
 - `--device cuda`：強制使用 GPU
 - `--device cpu`：只使用 CPU
 - 目標機器即使沒有 GPU，也仍可透過 CPU 模式執行
+- Nvidia 1080 至少可以作到放開 Ctrl 後 1 秒內馬上出字 (10秒鐘的錄音時長)
 
 ## Windows 打包方式
 
@@ -62,6 +71,9 @@ python hit_ctrl_talk.py
 
 ```powershell
 pyinstaller --noconfirm --clean --onefile --console hit_ctrl_talk.py
+或是執行
+build.bat
+
 ```
 
 輸出的結果位於 `dist\hit_ctrl_talk.exe`，理論上可在一般 Windows `x64` 主機上直接執行，不需要另外安裝 Python 或 conda。
@@ -77,3 +89,13 @@ pyinstaller --noconfirm --clean --onefile --console hit_ctrl_talk.py
 - 如果 `CUDA` 無法載入，程式在 `--device auto` 模式下應會自動回退到 CPU。
 - 如果某個程式不接受剪貼簿貼上，可改用 `--paste-mode unicode`。
 - 若目標應用程式輸入異常，建議先用記事本測試，確認是全域輸入問題還是特定軟體相容性問題。
+- 如果發生 cublas64_12.dll 找不到，語音辨識很慢的話，
+請參考：https://github.com/m-bain/whisperX/issues/1087
+然後至：https://github.com/Purfview/whisper-standalone-win/releases/tag/libs
+下載：cuBLAS.and.cuDNN_CUDA12_win_v3.7z
+
+如果是 conda 環境，把 cuBLAS.and.cuDNN_CUDA12_win_v3.7z 解壓縮，把裡面的 dll 與 
+D:\mytools\hit_ctrl_talk\hit-ctrl-talk\python.exe 放在同個目錄即可
+
+如果是編成 dist\hit-ctrl-talk.exe 就解壓縮，把裡面的 dll 與 這個 hit-ctrl-talk.exe 放一起即可
+
