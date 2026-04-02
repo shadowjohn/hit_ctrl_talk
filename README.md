@@ -1,8 +1,12 @@
 # hit_ctrl_talk
+ 
+## 操作示範
 
 這是一個 Windows `x64` 語音輸入工具。
 
 單獨按住任一顆 `Ctrl` 一小段時間後開始錄音，放開全部 `Ctrl` 後停止錄音，接著使用 `faster-whisper` 做語音辨識，再透過 `OpenCC` 把簡體中文轉成正體中文，最後把文字送進目前游標所在的應用程式。
+
+<video src="snapshot/talk.mp4" controls width="800"></video>
 
 # 作者
 
@@ -98,4 +102,4 @@ build.bat
 D:\mytools\hit_ctrl_talk\hit-ctrl-talk\python.exe 放在同個目錄即可
 
 如果是編成 dist\hit-ctrl-talk.exe 就解壓縮，把裡面的 dll 與 這個 hit-ctrl-talk.exe 放一起即可
-
+<img src="snapshot/S1.png">
