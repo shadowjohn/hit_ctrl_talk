@@ -11,7 +11,7 @@ if not exist "hit_ctrl_talk.py" (
 )
 
 
-c:\bin\convert icon.png icon.ico
+copy /y icon_bak.ico icon.ico
 
 where python >nul 2>nul
 if errorlevel 1 (
