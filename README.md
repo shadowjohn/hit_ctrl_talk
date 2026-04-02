@@ -6,7 +6,7 @@
 
 單獨按住任一顆 `Ctrl` 一小段時間後開始錄音，放開全部 `Ctrl` 後停止錄音，接著使用 `faster-whisper` 做語音辨識，再透過 `OpenCC` 把簡體中文轉成正體中文，最後把文字送進目前游標所在的應用程式。
 
-<video src="snapshot/talk.mp4" controls width="800"></video>
+範例影片：<a target="_blank" href="https://github.com/shadowjohn/hit_ctrl_talk/raw/refs/heads/main/snapshot/talk.mp4">https://github.com/shadowjohn/hit_ctrl_talk/raw/refs/heads/main/snapshot/talk.mp4</a>
 
 # 作者
 
