@@ -452,7 +452,7 @@ class TextInjector:
 class CtrlTalkApp:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.opencc = OpenCC("s2t")
+        self.opencc = OpenCC("s2twp") # 簡體中文轉繁體中文（臺灣正體）
         self.recorder = AudioRecorder(
             sample_rate=config.sample_rate,
             channels=config.channels,
@@ -729,6 +729,13 @@ class CtrlTalkApp:
                 return
 
             text = clean_text(self.opencc.convert(text))
+            text = text.replace("字幕by索蘭婭","").strip() # 這不知道三小
+            if text == "":
+                print(
+                    "[skip] transcription result is empty after cleaning. Original text: '%s'" % result.text,
+                    flush=True,
+                )
+                return
             print("[result:%s vad=%s] %s" % (result.device_used, result.used_vad, text), flush=True)
             self.injector.inject(text)
         except Exception as exc:
