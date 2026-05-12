@@ -48,6 +48,18 @@ CTRL_NAMES = {"ctrl", "left ctrl", "right ctrl"}
 ERROR_ALREADY_EXISTS = 183
 APP_MUTEX = None
 PHP = php.kit()
+OUTPUT_LANGUAGES = {
+    "zh-TW": "正體中文",
+    "zh-CN": "簡體中文",
+    "en": "English",
+    "ja": "日本語",
+}
+OUTPUT_TO_ASR_LANGUAGE = {
+    "zh-TW": "zh",
+    "zh-CN": "zh",
+    "en": "en",
+    "ja": "ja",
+}
 
 
 def is_windows() -> bool:
@@ -127,6 +139,7 @@ class AppConfig:
     model_name: str
     paste_mode: str
     language: str
+    output_language: str
     device_preference: str
     device_index: Optional[int]
     hold_ms: int
@@ -452,7 +465,8 @@ class TextInjector:
 class CtrlTalkApp:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.opencc = OpenCC("s2twp") # 簡體中文轉繁體中文（臺灣正體）
+        self.opencc_tw = OpenCC("s2twp") # 簡體中文轉繁體中文（臺灣正體）
+        self.opencc_cn = OpenCC("t2s") # 正體中文轉簡體中文
         self.recorder = AudioRecorder(
             sample_rate=config.sample_rate,
             channels=config.channels,
@@ -476,7 +490,7 @@ class CtrlTalkApp:
         self._start_tray_icon()
         self._start_worker()
         self._start_model_warmup()
-        print("[ready] paste_mode=%s" % self.config.paste_mode, flush=True)
+        print("[ready] paste_mode=%s output_language=%s" % (self.config.paste_mode, self.config.output_language), flush=True)
         print("[ready] model_dir=%s" % self.config.model_dir, flush=True)
         print(
             "[ready] hold either Ctrl alone for %dms to talk."
@@ -593,12 +607,14 @@ class CtrlTalkApp:
             "放開 Ctrl 後會進行辨識並貼上文字。\n\n"
             "模型：%s\n"
             "貼上模式：%s\n"
+            "輸出語言：%s\n"
             "模型資料夾：%s"
         ) % (
             AUTHOR_NAME,
             VERSION,
             self.config.model_name,
             self.config.paste_mode,
+            "%s (%s)" % (OUTPUT_LANGUAGES.get(self.config.output_language, self.config.output_language), self.config.output_language),
             self.config.model_dir,
         )
         show_message_box("關於 按著 Ctrl 然後講", message)
@@ -728,7 +744,7 @@ class CtrlTalkApp:
                 )
                 return
 
-            text = clean_text(self.opencc.convert(text))
+            text = self._format_output_text(text)
             text = text.replace("字幕by索蘭婭","").strip() # 這不知道三小
             if text == "":
                 print(
@@ -744,12 +760,21 @@ class CtrlTalkApp:
             with self._lock:
                 self._state = "idle"
 
+    def _format_output_text(self, text: str) -> str:
+        text = clean_text(text)
+        if self.config.output_language == "zh-TW":
+            return clean_text(self.opencc_tw.convert(text))
+        if self.config.output_language == "zh-CN":
+            return clean_text(self.opencc_cn.convert(text))
+        return text
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Hold Ctrl to talk, release Ctrl to transcribe.")
     parser.add_argument("--model", default="small", choices=["base", "small", "medium"])
     parser.add_argument("--paste-mode", default="clipboard", choices=["clipboard", "unicode"])
-    parser.add_argument("--language", default="zh")
+    parser.add_argument("--language", default=None, choices=["zh", "en", "ja", "ko", "yue", "auto"])
+    parser.add_argument("--output-language", default="zh-TW", choices=list(OUTPUT_LANGUAGES.keys()))
     parser.add_argument("--device", default="auto", choices=["auto", "cuda", "cpu"])
     parser.add_argument("--device-index", default=None, type=int)
     parser.add_argument("--hold-ms", default=200, type=int)
@@ -778,10 +803,15 @@ def main() -> int:
                 print("Unable to query audio devices: %s" % exc, file=sys.stderr)
                 return 1
 
+        asr_language = args.language
+        if asr_language in (None, "auto"):
+            asr_language = OUTPUT_TO_ASR_LANGUAGE.get(args.output_language, "zh")
+
         config = AppConfig(
             model_name=args.model,
             paste_mode=args.paste_mode,
-            language=args.language,
+            language=asr_language,
+            output_language=args.output_language,
             device_preference=args.device,
             device_index=args.device_index,
             hold_ms=max(50, args.hold_ms),
