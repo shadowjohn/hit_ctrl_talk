@@ -4,7 +4,7 @@
 
 這是一個 Windows `x64` 語音輸入工具。
 
-單獨按住任一顆 `Ctrl` 一小段時間後開始錄音，放開全部 `Ctrl` 後停止錄音，接著使用 `faster-whisper` 做語音辨識，再透過 `OpenCC` 把簡體中文轉成正體中文，最後把文字送進目前游標所在的應用程式。
+單獨按住任一顆 `Ctrl` 一小段時間後開始錄音，放開全部 `Ctrl` 後停止錄音，接著使用 `faster-whisper` 做語音辨識，再依輸出語言設定整理文字，最後把文字送進目前游標所在的應用程式。
 
 範例影片：<a target="_blank" href="https://github.com/shadowjohn/hit_ctrl_talk/raw/refs/heads/main/snapshot/talk.mp4">https://github.com/shadowjohn/hit_ctrl_talk/raw/refs/heads/main/snapshot/talk.mp4</a>
 
@@ -24,6 +24,7 @@ V0.0.1
 - 如果已經開始錄音後又按了其他鍵，這次錄音會直接丟棄。
 - 啟動後會在右下角系統匣顯示 `icon.png` 圖示，右鍵可看到 `About` / `Quit`，左鍵會觸發 `About`。
 - 預設輸出模式為剪貼簿貼上，也支援直接送出 Unicode 文字。
+- 支援輸出語言選擇：正體中文、簡體中文、英文、日文。
 - 在 `--device auto` 模式下，Whisper 會先嘗試使用 `CUDA`，失敗時自動回退到 `CPU`。
 
 ## 建議 Python 版本
@@ -56,10 +57,25 @@ python hit_ctrl_talk.py --model small --paste-mode clipboard --device auto --hol
 python hit_ctrl_talk.py --paste-mode unicode
 python hit_ctrl_talk.py --device cpu
 python hit_ctrl_talk.py --device-index 1
+python hit_ctrl_talk.py --output-language zh-TW
+python hit_ctrl_talk.py --output-language zh-CN
+python hit_ctrl_talk.py --output-language en
+python hit_ctrl_talk.py --output-language ja
 
-# 啥都不寫就自動 --model small --paste-mode clipboard --device auto --hold-ms 300
+# 啥都不寫就自動 --model small --paste-mode clipboard --device auto --hold-ms 100 --output-language zh-TW
 python hit_ctrl_talk.py 
 ```
+
+## 輸出語言
+
+| 參數 | 說明 |
+|------|------|
+| `zh-TW` | 正體中文，使用 OpenCC `s2twp` 整理為臺灣正體。 |
+| `zh-CN` | 簡體中文，使用 OpenCC `t2s` 整理為簡體。 |
+| `en` | 英文，預設將 ASR 語言指定為英文，不做中文轉換。 |
+| `ja` | 日文，預設將 ASR 語言指定為日文，不做中文轉換。 |
+
+若要手動指定辨識語言，可搭配 `--language zh|en|ja|ko|yue|auto`；未指定時會依 `--output-language` 自動選擇。
 
 ## GPU 說明
 
