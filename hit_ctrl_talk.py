@@ -10,6 +10,7 @@ the active application.
 from __future__ import annotations
 
 import argparse
+import json
 import ctypes
 import os
 import queue
@@ -19,6 +20,8 @@ import threading
 import time
 import the_icon
 import base64
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Set, Tuple
 
@@ -57,9 +60,14 @@ OUTPUT_LANGUAGES = {
 OUTPUT_TO_ASR_LANGUAGE = {
     "zh-TW": "zh",
     "zh-CN": "zh",
-    "en": "en",
-    "ja": "ja",
+    "en": "zh",
+    "ja": "zh",
 }
+GOOGLE_TRANSLATE_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/148.0.0.0 Safari/537.36"
+)
 
 
 def is_windows() -> bool:
@@ -364,6 +372,74 @@ class ModelManager:
             self._device_used = None
 
 
+class GoogleTranslateClient:
+    def __init__(self, timeout: float = 4.0, retries: int = 1) -> None:
+        self.timeout = timeout
+        self.retries = retries
+
+    def translate(self, text: str, target_language: str, source_language: str = "zh-TW") -> str:
+        text = clean_text(text)
+        if not text:
+            return ""
+
+        last_error: Optional[Exception] = None
+        for attempt in range(self.retries + 1):
+            try:
+                return self._translate_once(text, target_language, source_language)
+            except Exception as exc:
+                last_error = exc
+                print(
+                    "[translate] google failed attempt %d/%d: %s"
+                    % (attempt + 1, self.retries + 1, exc),
+                    flush=True,
+                )
+                if attempt < self.retries:
+                    time.sleep(0.35)
+
+        print("[translate] fallback to original text: %s" % last_error, flush=True)
+        return text
+
+    def _translate_once(self, text: str, target_language: str, source_language: str) -> str:
+        target_language = target_language.replace("_", "-")
+        source_language = source_language.replace("_", "-")
+        if target_language not in {"en", "ja"}:
+            raise ValueError("unsupported target language: %s" % target_language)
+
+        params = urllib.parse.urlencode(
+            {
+                "client": "gtx",
+                "sl": source_language,
+                "tl": target_language,
+                "dt": "t",
+                "ie": "UTF-8",
+                "oe": "UTF-8",
+                "q": text,
+            }
+        )
+        url = "https://translate.googleapis.com/translate_a/single?%s" % params
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": GOOGLE_TRANSLATE_USER_AGENT,
+                "Accept": "application/json,text/plain,*/*",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+
+        data = json.loads(raw)
+        translated_parts: List[str] = []
+        if data and isinstance(data[0], list):
+            for segment in data[0]:
+                if isinstance(segment, list) and segment:
+                    translated_parts.append(str(segment[0]))
+
+        translated = clean_text("".join(translated_parts))
+        if not translated:
+            raise RuntimeError("empty translation response")
+        return translated
+
+
 class TextInjector:
     def __init__(self, paste_mode: str) -> None:
         self.paste_mode = paste_mode
@@ -474,6 +550,7 @@ class CtrlTalkApp:
         )
         self.model_manager = ModelManager(config)
         self.injector = TextInjector(config.paste_mode)
+        self.translator = GoogleTranslateClient()
         self._lock = threading.Lock()
         self._pressed_ctrls: Set[str] = set()
         self._candidate_id = 0
@@ -573,21 +650,34 @@ class CtrlTalkApp:
             #生小圖，等會載入完就移除            
             try:
                 PHP.file_put_contents(icon_path,raw_data,False)      
-            except e:      
+            except Exception:
                 pass
 
-        menu_options = (
-            ("關於 (About)", None, [self._on_tray_about]),
-            ("結束 (Quit)", None, [self._on_tray_quit]),
-        )
         self._systray = SysTrayIcon(
             icon_path,
             "按 Ctrl 講話 (Hold Ctrl to Talk) BY \n%s\nV%s" % (AUTHOR_NAME, VERSION),
-            menu_options,
+            self._build_tray_menu_options(),
         )
         self._systray.start()
         print("[tray] using icon file: %s" % icon_path, flush=True)
         print("[tray] icon visible.", flush=True)
+
+    def _build_tray_menu_options(self):
+        language_options = []
+        for language_code, language_name in OUTPUT_LANGUAGES.items():
+            prefix = "(✓) " if self.config.output_language == language_code else "    "
+            language_options.append(
+                (
+                    "%s%s" % (prefix, language_name),
+                    None,
+                    [self._on_output_language_selected, language_code],
+                )
+            )
+        return (
+            ("關於 (About)", None, [self._on_tray_about]),
+            ("輸出語言", None, tuple(language_options)),
+            ("結束 (Quit)", None, [self._on_tray_quit]),
+        )
 
     def _on_tray_about(self, systray=None, params=None) -> None:
         self._show_about()
@@ -595,6 +685,27 @@ class CtrlTalkApp:
     def _on_tray_quit(self, systray=None, params=None) -> None:
         print("[quit] tray menu requested exit.", flush=True)
         self._stop_event.set()
+
+    def _on_output_language_selected(self, systray=None, params=None) -> None:
+        if not params:
+            return
+        language_code = params[0]
+        self._set_output_language(language_code)
+
+    def _set_output_language(self, language_code: str) -> None:
+        if language_code not in OUTPUT_LANGUAGES:
+            print("[language] unsupported output language: %s" % language_code, flush=True)
+            return
+        with self._lock:
+            self.config.output_language = language_code
+            self.config.language = OUTPUT_TO_ASR_LANGUAGE.get(language_code, "zh")
+        if self._systray is not None:
+            self._systray.update(menu_options=self._build_tray_menu_options())
+        print(
+            "[language] output_language=%s asr_language=%s"
+            % (self.config.output_language, self.config.language),
+            flush=True,
+        )
 
     def _show_about(self) -> None:
         global AUTHOR_NAME
@@ -766,6 +877,15 @@ class CtrlTalkApp:
             return clean_text(self.opencc_tw.convert(text))
         if self.config.output_language == "zh-CN":
             return clean_text(self.opencc_cn.convert(text))
+        if self.config.output_language in {"en", "ja"}:
+            source_text = clean_text(self.opencc_tw.convert(text))
+            return clean_text(
+                self.translator.translate(
+                    source_text,
+                    target_language=self.config.output_language,
+                    source_language="zh-TW",
+                )
+            )
         return text
 
 

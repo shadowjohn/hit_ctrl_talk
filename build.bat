@@ -10,6 +10,7 @@ if not exist "hit_ctrl_talk.py" (
     exit /b 1
 )
 
+call conda.bat activate "%cd%\hit_ctrl_talk"
 
 copy /y icon_bak.ico icon.ico
 
