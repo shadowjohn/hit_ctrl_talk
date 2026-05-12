@@ -752,7 +752,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--language", default="zh")
     parser.add_argument("--device", default="auto", choices=["auto", "cuda", "cpu"])
     parser.add_argument("--device-index", default=None, type=int)
-    parser.add_argument("--hold-ms", default=100, type=int)
+    parser.add_argument("--hold-ms", default=200, type=int)
     parser.add_argument("--no-vad", action="store_true")
     parser.add_argument("--debug-audio", action="store_true")
     parser.add_argument("--list-devices", action="store_true")
